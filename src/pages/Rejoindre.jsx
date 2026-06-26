@@ -32,20 +32,22 @@ export default function Rejoindre() {
         return;
       }
 
-      await ajouterJoueur(code.toUpperCase(), nom);
+      const codeSession = code.toUpperCase();
+      await ajouterJoueur(codeSession, nom);
+
       setRejoint(true);
       setHote(session.hote);
-      setCode(code.toUpperCase());
+      setCode(codeSession);
 
       const checkInterval = setInterval(async () => {
         try {
-          const updatedSession = await obtenirSession(code.toUpperCase());
+          const updatedSession = await obtenirSession(codeSession);
           if (updatedSession && updatedSession.statut === 'en_cours') {
             clearInterval(checkInterval);
-            navigate(`/attribution/${code.toUpperCase()}/${nom}`);
+            navigate(`/attribution/${codeSession}/${nom}`);
           }
         } catch (error) {
-          console.error('Erreur:', error);
+          console.error('Erreur vérification statut:', error);
         }
       }, 1000);
     } catch (error) {

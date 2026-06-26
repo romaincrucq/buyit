@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { attributerEntrepriseAuJoueur, obtenirJoueur } from '../lib/sessionService';
+import { attributerEntrepriseAuJoueur, obtenirJoueur, obtenirSession } from '../lib/sessionService';
 import { obtenirEntreprise } from '../data/entreprises';
 
 export default function Attribution() {
@@ -13,42 +13,90 @@ export default function Attribution() {
 
   useEffect(() => {
     const attribuer = async () => {
-      try {
-        const joueur = await obtenirJoueur(code, nom);
-        if (!joueur) {
-          setErreur('Joueur non trouvé');
+      let tentatives = 0;
+      const maxTentatives = 5;
+
+      const essayer = async () => {
+        try {
+          let joueur = await obtenirJoueur(code, nom);
+          let nomJoueur = nom;
+
+          if (!joueur) {
+            const session = await obtenirSession(code);
+            if (!session || !session.joueurs) {
+              setErreur('Session non trouvée');
+              setLoading(false);
+              return;
+            }
+
+            const joueurs = Object.keys(session.joueurs);
+            const nomTrouve = joueurs.find(n => n.toLowerCase() === nom.toLowerCase());
+
+            if (!nomTrouve) {
+              if (tentatives < maxTentatives) {
+                tentatives++;
+                console.log(`Tentative ${tentatives}: joueur non trouvé, nouvelle tentative dans 1s`);
+                setTimeout(essayer, 1000);
+                return;
+              }
+              setErreur('Joueur non trouvé dans la session');
+              setLoading(false);
+              return;
+            }
+
+            nomJoueur = nomTrouve;
+            joueur = await obtenirJoueur(code, nomJoueur);
+          }
+
+          if (!joueur) {
+            if (tentatives < maxTentatives) {
+              tentatives++;
+              console.log(`Tentative ${tentatives}: données joueur vides, nouvelle tentative dans 1s`);
+              setTimeout(essayer, 1000);
+              return;
+            }
+            setErreur('Impossible de récupérer les infos du joueur');
+            setLoading(false);
+            return;
+          }
+
+          let entrepriseId = null;
+
+          if (joueur.entreprises && joueur.entreprises.length > 0) {
+            entrepriseId = joueur.entreprises[0].id;
+          } else {
+            entrepriseId = await attributerEntrepriseAuJoueur(code, nomJoueur);
+          }
+
+          if (!entrepriseId) {
+            setErreur('Pas d\'entreprise disponible');
+            setLoading(false);
+            return;
+          }
+
+          const entreprise = obtenirEntreprise(entrepriseId);
+          setEntrepriseAttribuee({
+            joueur: nomJoueur,
+            entrepriseId,
+            entreprise,
+          });
+
           setLoading(false);
-          return;
-        }
-
-        let entrepriseId = null;
-
-        if (joueur.entreprises && joueur.entreprises.length > 0) {
-          entrepriseId = joueur.entreprises[0].id;
-        } else {
-          entrepriseId = await attributerEntrepriseAuJoueur(code, nom);
-        }
-
-        if (!entrepriseId) {
-          setErreur('Pas d\'entreprise disponible');
+          setPret(true);
+        } catch (error) {
+          console.error('Erreur attribution:', error);
+          if (tentatives < maxTentatives) {
+            tentatives++;
+            console.log(`Tentative ${tentatives}: erreur, nouvelle tentative dans 1s`);
+            setTimeout(essayer, 1000);
+            return;
+          }
+          setErreur(error.message || 'Erreur lors de l\'attribution');
           setLoading(false);
-          return;
         }
+      };
 
-        const entreprise = obtenirEntreprise(entrepriseId);
-        setEntrepriseAttribuee({
-          joueur: nom,
-          entrepriseId,
-          entreprise,
-        });
-
-        setLoading(false);
-        setPret(true);
-      } catch (error) {
-        console.error('Erreur attribution:', error);
-        setErreur(error.message || 'Erreur lors de l\'attribution');
-        setLoading(false);
-      }
+      essayer();
     };
 
     attribuer();
