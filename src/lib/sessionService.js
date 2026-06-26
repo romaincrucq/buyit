@@ -1,5 +1,6 @@
 import { ref, set, get, update, onValue, off } from 'firebase/database';
 import { db } from './firebase';
+import { obtenirEntreprise } from '../data/entreprises';
 
 export async function creerSession(codeSession, nomHote) {
   const sessionRef = ref(db, `sessions/${codeSession}`);
@@ -62,6 +63,12 @@ export function ecouterSession(codeSession, callback) {
   return () => off(sessionRef);
 }
 
+export async function obtenirJoueur(codeSession, nom) {
+  const joueurRef = ref(db, `sessions/${codeSession}/joueurs/${nom}`);
+  const snapshot = await get(joueurRef);
+  return snapshot.val();
+}
+
 export function ecouterJoueur(codeSession, nom, callback) {
   const joueurRef = ref(db, `sessions/${codeSession}/joueurs/${nom}`);
   onValue(joueurRef, (snapshot) => {
@@ -80,6 +87,49 @@ export async function ajouterAction(codeSession, action) {
     timestamp: new Date().toISOString(),
   });
   await set(actionRef, actions);
+}
+
+export async function attributerEntrepriseAuJoueur(codeSession, nomJoueur) {
+  const joueurRef = ref(db, `sessions/${codeSession}/joueurs/${nomJoueur}`);
+  const joueurSnapshot = await get(joueurRef);
+  const joueur = joueurSnapshot.val();
+
+  if (!joueur) {
+    throw new Error('Joueur non trouvé');
+  }
+
+  if (joueur.entreprises && joueur.entreprises.length > 0) {
+    return joueur.entreprises[0].id;
+  }
+
+  const disponiblesRef = ref(db, `sessions/${codeSession}/entreprisesDisponibles`);
+  const dispSnapshot = await get(disponiblesRef);
+  let disponibles = dispSnapshot.val() || [];
+
+  if (disponibles.length === 0) {
+    throw new Error('Pas d\'entreprise disponible');
+  }
+
+  const randomIndex = Math.floor(Math.random() * disponibles.length);
+  const entrepriseId = disponibles[randomIndex];
+
+  const entreprise = obtenirEntreprise(entrepriseId);
+
+  const entreprisesJoueur = joueur.entreprises || [];
+  entreprisesJoueur.push({
+    id: entrepriseId,
+    valeur: entreprise.valeurInitiale,
+    valeurInitiale: entreprise.valeurInitiale,
+    caisse: 0,
+    dette: 0,
+  });
+
+  await update(joueurRef, { entreprises: entreprisesJoueur });
+
+  disponibles = disponibles.filter(e => e !== entrepriseId);
+  await set(disponiblesRef, disponibles);
+
+  return entrepriseId;
 }
 
 export async function attributerEntreprise(codeSession, nomJoueur, entrepriseId, valeur) {

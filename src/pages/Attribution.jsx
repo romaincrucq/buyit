@@ -1,52 +1,52 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { attributerEntreprise, obtenirSession } from '../lib/sessionService';
+import { attributerEntrepriseAuJoueur, obtenirJoueur } from '../lib/sessionService';
 import { obtenirEntreprise } from '../data/entreprises';
 
 export default function Attribution() {
   const { code, nom } = useParams();
   const navigate = useNavigate();
-  const [entreprises, setEntreprises] = useState([]);
   const [entrepriseAttribuee, setEntrepriseAttribuee] = useState(null);
-  const [animationIndex, setAnimationIndex] = useState(-1);
   const [pret, setPret] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [erreur, setErreur] = useState(null);
 
   useEffect(() => {
     const attribuer = async () => {
       try {
-        const session = await obtenirSession(code);
-        if (!session) return;
-
-        const joueurs = Object.keys(session.joueurs || {});
-        const disponibles = session.entreprisesDisponibles || [];
-
-        const entreprisesAttribuees = [];
-        for (const joueur of joueurs) {
-          if (joueur === nom && disponibles.length > 0) {
-            const randomIndex = Math.floor(Math.random() * disponibles.length);
-            const entrepriseId = disponibles[randomIndex];
-            const entreprise = obtenirEntreprise(entrepriseId);
-
-            entreprisesAttribuees.push({
-              joueur,
-              entrepriseId,
-              entreprise,
-            });
-
-            await attributerEntreprise(code, joueur, entrepriseId, entreprise.valeurInitiale);
-            setEntrepriseAttribuee({
-              joueur,
-              entrepriseId,
-              entreprise,
-            });
-          }
+        const joueur = await obtenirJoueur(code, nom);
+        if (!joueur) {
+          setErreur('Joueur non trouvé');
+          setLoading(false);
+          return;
         }
+
+        let entrepriseId = null;
+
+        if (joueur.entreprises && joueur.entreprises.length > 0) {
+          entrepriseId = joueur.entreprises[0].id;
+        } else {
+          entrepriseId = await attributerEntrepriseAuJoueur(code, nom);
+        }
+
+        if (!entrepriseId) {
+          setErreur('Pas d\'entreprise disponible');
+          setLoading(false);
+          return;
+        }
+
+        const entreprise = obtenirEntreprise(entrepriseId);
+        setEntrepriseAttribuee({
+          joueur: nom,
+          entrepriseId,
+          entreprise,
+        });
 
         setLoading(false);
         setPret(true);
       } catch (error) {
         console.error('Erreur attribution:', error);
+        setErreur(error.message || 'Erreur lors de l\'attribution');
         setLoading(false);
       }
     };
@@ -67,10 +67,12 @@ export default function Attribution() {
     );
   }
 
-  if (!entrepriseAttribuee) {
+  if (erreur || !entrepriseAttribuee) {
     return (
       <div className="container-sm" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-        <p style={{ color: '#ef4444' }}>Erreur lors de l'attribution</p>
+        <p style={{ color: '#ef4444' }}>
+          {erreur || 'Erreur lors de l\'attribution'}
+        </p>
       </div>
     );
   }
