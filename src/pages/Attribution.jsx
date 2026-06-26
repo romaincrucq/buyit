@@ -14,7 +14,8 @@ export default function Attribution() {
   useEffect(() => {
     const attribuer = async () => {
       let tentatives = 0;
-      const maxTentatives = 5;
+      const maxTentatives = 15;
+      const delaiBase = 500;
 
       const essayer = async () => {
         try {
@@ -24,6 +25,15 @@ export default function Attribution() {
           if (!joueur) {
             const session = await obtenirSession(code);
             if (!session || !session.joueurs) {
+              if (tentatives < maxTentatives) {
+                tentatives++;
+                const delai = delaiBase * (1 + tentatives * 0.2);
+                console.log(
+                  `Tentative ${tentatives}/${maxTentatives}: Session non trouvée, nouvelle tentative dans ${delai}ms`
+                );
+                setTimeout(essayer, delai);
+                return;
+              }
               setErreur('Session non trouvée');
               setLoading(false);
               return;
@@ -35,8 +45,13 @@ export default function Attribution() {
             if (!nomTrouve) {
               if (tentatives < maxTentatives) {
                 tentatives++;
-                console.log(`Tentative ${tentatives}: joueur non trouvé, nouvelle tentative dans 1s`);
-                setTimeout(essayer, 1000);
+                const delai = delaiBase * (1 + tentatives * 0.2);
+                console.log(
+                  `Tentative ${tentatives}/${maxTentatives}: Joueur "${nom}" non trouvé dans [${joueurs.join(
+                    ', '
+                  )}], nouvelle tentative dans ${delai}ms`
+                );
+                setTimeout(essayer, delai);
                 return;
               }
               setErreur('Joueur non trouvé dans la session');
@@ -51,8 +66,11 @@ export default function Attribution() {
           if (!joueur) {
             if (tentatives < maxTentatives) {
               tentatives++;
-              console.log(`Tentative ${tentatives}: données joueur vides, nouvelle tentative dans 1s`);
-              setTimeout(essayer, 1000);
+              const delai = delaiBase * (1 + tentatives * 0.2);
+              console.log(
+                `Tentative ${tentatives}/${maxTentatives}: Données joueur vides, nouvelle tentative dans ${delai}ms`
+              );
+              setTimeout(essayer, delai);
               return;
             }
             setErreur('Impossible de récupérer les infos du joueur');
@@ -84,11 +102,12 @@ export default function Attribution() {
           setLoading(false);
           setPret(true);
         } catch (error) {
-          console.error('Erreur attribution:', error);
+          console.error('Erreur attribution (tentative ' + tentatives + '):', error);
           if (tentatives < maxTentatives) {
             tentatives++;
-            console.log(`Tentative ${tentatives}: erreur, nouvelle tentative dans 1s`);
-            setTimeout(essayer, 1000);
+            const delai = delaiBase * (1 + tentatives * 0.2);
+            console.log(`Tentative ${tentatives}/${maxTentatives}: Erreur, nouvelle tentative dans ${delai}ms`);
+            setTimeout(essayer, delai);
             return;
           }
           setErreur(error.message || 'Erreur lors de l\'attribution');

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { creerSession, obtenirSession, mettreAJourSession } from '../lib/sessionService';
+import { creerSession, obtenirSession, mettreAJourSession, obtenirJoueur } from '../lib/sessionService';
 import { genererCodeSession } from '../lib/gameLogic';
 import { ENTREPRISES } from '../data/entreprises';
 
@@ -57,6 +57,44 @@ export default function Heberger() {
     }
 
     try {
+      console.log('Vérification que tous les joueurs sont enregistrés...');
+
+      let tousLesJoueursExistent = false;
+      let tentatives = 0;
+      const maxTentatives = 5;
+
+      while (!tousLesJoueursExistent && tentatives < maxTentatives) {
+        tentatives++;
+        let joueurstrouvees = 0;
+
+        for (const nomJoueur of joueurs) {
+          try {
+            const joueur = await obtenirJoueur(code, nomJoueur);
+            if (joueur) {
+              joueurstrouvees++;
+            }
+          } catch (error) {
+            console.log(`Erreur vérification joueur ${nomJoueur}:`, error);
+          }
+        }
+
+        tousLesJoueursExistent = joueurstrouvees === joueurs.length;
+
+        if (!tousLesJoueursExistent && tentatives < maxTentatives) {
+          console.log(
+            `${joueurstrouvees}/${joueurs.length} joueurs trouvés, tentative ${tentatives}/${maxTentatives}. Nouvelle tentative dans 1s...`
+          );
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      if (!tousLesJoueursExistent) {
+        alert('Certains joueurs ne sont pas encore enregistrés. Veuillez réessayer.');
+        return;
+      }
+
+      console.log('Tous les joueurs sont enregistrés. Lancement de la partie...');
+
       const entreprisesIds = ENTREPRISES.map(e => e.id);
       const entreprisesPour = entreprisesIds.slice(0, joueurs.length);
 
