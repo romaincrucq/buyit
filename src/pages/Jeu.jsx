@@ -55,6 +55,13 @@ export default function Jeu() {
     return () => clearInterval(interval);
   }, [code, nom]);
 
+  useEffect(() => {
+    if (etape === 1) {
+      console.log('Pioche automatique en arrière-plan, passage à l\'étape 2');
+      setEtape(2);
+    }
+  }, [etape]);
+
   const validerDes = async () => {
     const resultat = parseInt(inputDes, 10);
 
