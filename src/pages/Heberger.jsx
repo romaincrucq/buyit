@@ -11,6 +11,8 @@ export default function Heberger() {
   const [joueurs, setJoueurs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sessionCree, setSessionCree] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyingMessage, setVerifyingMessage] = useState('');
 
   const creerNouvelleSesion = async () => {
     if (!nom.trim()) {
@@ -56,44 +58,57 @@ export default function Heberger() {
       return;
     }
 
+    setVerifying(true);
+    setVerifyingMessage('Vérification des connexions...');
+
     try {
-      console.log('Vérification que tous les joueurs sont enregistrés...');
+      console.log('Vérification que tous les joueurs sont complètement enregistrés...');
 
-      let tousLesJoueursExistent = false;
+      let tousLesJoueursOK = false;
       let tentatives = 0;
-      const maxTentatives = 5;
+      const maxTentatives = 20;
+      const delaiVérification = 500;
 
-      while (!tousLesJoueursExistent && tentatives < maxTentatives) {
+      while (!tousLesJoueursOK && tentatives < maxTentatives) {
         tentatives++;
-        let joueurstrouvees = 0;
+        let joueursValides = 0;
+        const messages = [];
 
         for (const nomJoueur of joueurs) {
           try {
             const joueur = await obtenirJoueur(code, nomJoueur);
-            if (joueur) {
-              joueurstrouvees++;
+            if (joueur && joueur.nom && joueur.cash !== undefined) {
+              joueursValides++;
+            } else {
+              messages.push(`${nomJoueur}: données incomplètes`);
             }
           } catch (error) {
-            console.log(`Erreur vérification joueur ${nomJoueur}:`, error);
+            messages.push(`${nomJoueur}: non trouvé`);
           }
         }
 
-        tousLesJoueursExistent = joueurstrouvees === joueurs.length;
+        tousLesJoueursOK = joueursValides === joueurs.length;
 
-        if (!tousLesJoueursExistent && tentatives < maxTentatives) {
-          console.log(
-            `${joueurstrouvees}/${joueurs.length} joueurs trouvés, tentative ${tentatives}/${maxTentatives}. Nouvelle tentative dans 1s...`
+        if (!tousLesJoueursOK && tentatives < maxTentatives) {
+          const tempsRestant = Math.ceil(((maxTentatives - tentatives) * delaiVérification) / 1000);
+          setVerifyingMessage(
+            `Vérification des connexions... (${joueursValides}/${joueurs.length} connectés) - ${tempsRestant}s`
           );
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          console.log(
+            `${joueursValides}/${joueurs.length} joueurs valides, tentative ${tentatives}/${maxTentatives}. ${messages.length > 0 ? 'Problèmes: ' + messages.join(', ') : ''}`
+          );
+          await new Promise(resolve => setTimeout(resolve, delaiVérification));
         }
       }
 
-      if (!tousLesJoueursExistent) {
-        alert('Certains joueurs ne sont pas encore enregistrés. Veuillez réessayer.');
+      if (!tousLesJoueursOK) {
+        setVerifying(false);
+        alert('Certains joueurs ne sont pas complètement connectés après 10 secondes. Veuillez réessayer.');
         return;
       }
 
-      console.log('Tous les joueurs sont enregistrés. Lancement de la partie...');
+      console.log('Tous les joueurs sont complètement enregistrés. Lancement de la partie...');
+      setVerifyingMessage('Lancement de la partie...');
 
       const entreprisesIds = ENTREPRISES.map(e => e.id);
       const entreprisesPour = entreprisesIds.slice(0, joueurs.length);
@@ -103,9 +118,11 @@ export default function Heberger() {
         entreprisesDisponibles: entreprisesPour,
       });
 
+      setVerifying(false);
       navigate(`/attribution/${code}/${nom}`);
     } catch (error) {
       console.error('Erreur lancement:', error);
+      setVerifying(false);
       alert('Erreur lors du lancement');
     }
   };
@@ -136,6 +153,36 @@ export default function Heberger() {
           >
             {loading ? 'Création...' : 'Créer la session'}
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (verifying) {
+    return (
+      <div className="container-sm" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div className="card" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1.5rem', animation: 'pulse 1.5s ease-in-out infinite' }}>
+            🔍
+          </div>
+          <h3 style={{ marginBottom: '1rem' }}>{verifyingMessage}</h3>
+          <div style={{
+            height: '4px',
+            backgroundColor: 'rgba(201, 168, 76, 0.2)',
+            borderRadius: '2px',
+            overflow: 'hidden',
+            marginBottom: '1rem'
+          }}>
+            <div style={{
+              height: '100%',
+              backgroundColor: 'var(--accent)',
+              animation: 'slideRight 2s ease-in-out infinite',
+              width: '30%'
+            }} />
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
+            Vérification de la connexion de tous les joueurs avant lancement...
+          </p>
         </div>
       </div>
     );
@@ -173,9 +220,10 @@ export default function Heberger() {
       <button
         className="btn btn-success"
         onClick={lancerPartie}
+        disabled={verifying}
         style={{ width: '100%', padding: '1rem' }}
       >
-        Lancer la partie
+        {verifying ? 'Lancement...' : 'Lancer la partie'}
       </button>
     </div>
   );
