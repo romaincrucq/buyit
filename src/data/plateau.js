@@ -1,3 +1,12 @@
+export const SECTEURS = {
+  'Agroalimentaire': { cases: [4, 5, 6], entreprises: ['cereales', 'biopremium', 'boissons'] },
+  'Tech': { cases: [11, 12, 13], entreprises: ['reseaux', 'jeux', 'ia'] },
+  'Pharma/Médical': { cases: [16, 17, 18], entreprises: ['medicaments', 'vaccins', 'equipements'] },
+  'Industrie': { cases: [22, 23, 24], entreprises: ['automobile', 'aeronautique', 'materiaux'] },
+  'Grande Distribution': { cases: [29, 30, 31], entreprises: ['hypermarche', 'ecommerce', 'fastfood'] },
+  'Énergie': { cases: [34, 35, 36], entreprises: ['nucleaire', 'fossile', 'renouvelable'] },
+};
+
 export const PLATEAU = [
   { numero: 1, nom: 'Départ', type: 'depart', effet: 'Prime +5 cash (sauf tour 1)' },
   { numero: 2, nom: 'Décision', type: 'decision' },
@@ -51,4 +60,37 @@ export function aPasseParDepart(anciennePos, nouvellePos, resultatDes) {
   if (nouvellePos === 0) nouvellePos = 36;
 
   return (anciennePos + resultatDes) > 36;
+}
+
+export function obtenirSecteurDeLaCase(numero) {
+  for (const [secteur, info] of Object.entries(SECTEURS)) {
+    if (info.cases.includes(numero)) {
+      return secteur;
+    }
+  }
+  return null;
+}
+
+export function obtenirEntreprisesDisponiblesDuSecteur(secteur, joueursData) {
+  if (!SECTEURS[secteur]) return [];
+
+  const idsEntreprises = SECTEURS[secteur].entreprises;
+  const entreprisesAchetees = [];
+
+  for (const joueur of Object.values(joueursData || {})) {
+    if (joueur.entreprises) {
+      joueur.entreprises.forEach(e => {
+        if (idsEntreprises.includes(e.id)) {
+          entreprisesAchetees.push(e.id);
+        }
+      });
+    }
+  }
+
+  return idsEntreprises.filter(id => !entreprisesAchetees.includes(id));
+}
+
+export function obtenirEntrepriseCorrespondanteLaCase(numero) {
+  const caseData = PLATEAU.find(c => c.numero === numero);
+  return caseData?.entrepriseId || null;
 }

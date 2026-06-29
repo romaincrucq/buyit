@@ -4,7 +4,7 @@ import { obtenirSession, mettreAJourSession, mettreAJourJoueur } from '../lib/se
 import { obtenirEntreprise, ENTREPRISES } from '../data/entreprises';
 import { SYNERGIES } from '../data/synergies';
 import { CONFIG, calculerProgression, calculerRevenu, calculerNouvelleValeur, calculerCouts, calculerDividendes, estEnFaillite } from '../lib/gameLogic';
-import { PLATEAU, obtenirCase, calculerNouvellePosition, aPasseParDepart } from '../data/plateau';
+import { PLATEAU, obtenirCase, calculerNouvellePosition, aPasseParDepart, obtenirSecteurDeLaCase, obtenirEntreprisesDisponiblesDuSecteur, obtenirEntrepriseCorrespondanteLaCase } from '../data/plateau';
 import { obtenirCarte } from '../data/cartes';
 import TourGuide from '../components/TourGuide';
 import CarteDecision from '../components/CarteDecision';
@@ -34,6 +34,8 @@ export default function Jeu() {
   const [entrepriseSelectionnee, setEntrepriseSelectionnee] = useState(null);
   const [montantAction, setMontantAction] = useState('');
   const [erreurAction, setErreurAction] = useState('');
+  const [entreprisesDispoCaseEtape3, setEntreprisesDispoCaseEtape3] = useState([]);
+  const [secteurCaseEtape3, setSecteurCaseEtape3] = useState(null);
 
   useEffect(() => {
     const charger = async () => {
@@ -435,10 +437,18 @@ export default function Jeu() {
           </div>
         );
 
-      case 3:
+      case 3: {
         const caseActuelleEtape3 = obtenirCase(position);
         const estDecision = caseActuelleEtape3?.type === 'decision';
         const estGeopolitique = caseActuelleEtape3?.type === 'geopolitique';
+        const estEntreprise = caseActuelleEtape3?.type === 'entreprise';
+
+        if (estEntreprise && secteurCaseEtape3 === null) {
+          const secteur = obtenirSecteurDeLaCase(position);
+          setSecteurCaseEtape3(secteur);
+          const dispo = obtenirEntreprisesDisponiblesDuSecteur(secteur, session.joueurs);
+          setEntreprisesDispoCaseEtape3(dispo);
+        }
 
         return (
           <div className="card">
@@ -535,6 +545,72 @@ export default function Jeu() {
                   </div>
                 )}
               </>
+            ) : estEntreprise ? (
+              <>
+                <h3 style={{ marginBottom: '1.5rem' }}>🏢 Secteur {secteurCaseEtape3}</h3>
+                <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
+                  Choisis une entreprise à acheter dans ce secteur (si disponible)
+                </p>
+
+                {entreprisesDispoCaseEtape3.length > 0 ? (
+                  <div>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                        Entreprises disponibles :
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {entreprisesDispoCaseEtape3.map(idEntreprise => {
+                          const ent = obtenirEntreprise(idEntreprise);
+                          return (
+                            <button
+                              key={idEntreprise}
+                              className="btn btn-secondary"
+                              onClick={() => {
+                                joueur.entreprises.push({
+                                  id: idEntreprise,
+                                  valeur: ent.valeurInitiale,
+                                  valeurInitiale: ent.valeurInitiale,
+                                  caisse: 0,
+                                  dette: 0,
+                                });
+                                mettreAJourJoueur(code, nom, { entreprises: joueur.entreprises });
+                                setSecteurCaseEtape3(null);
+                                setEntreprisesDispoCaseEtape3([]);
+                                setEtape(5);
+                              }}
+                              style={{ padding: '0.75rem', textAlign: 'left' }}
+                            >
+                              💰 {ent.nom} ({ent.valeurInitiale} cash)
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ marginBottom: '1.5rem', color: 'var(--accent)', fontWeight: 'bold' }}>
+                      ⚠️ Toutes les entreprises du secteur sont déjà achetées !
+                    </p>
+                    <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
+                      Tu dois payer 10 💰 au propriétaire de l'entreprise de ta case.
+                    </p>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        joueur.cash = Math.max(0, (joueur.cash || 0) - 10);
+                        mettreAJourJoueur(code, nom, { cash: joueur.cash });
+                        setSecteurCaseEtape3(null);
+                        setEntreprisesDispoCaseEtape3([]);
+                        setEtape(5);
+                      }}
+                      style={{ width: '100%' }}
+                    >
+                      Payer le loyer
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <>
                 <h3 style={{ marginBottom: '1.5rem' }}>Case {position}: {caseActuelleEtape3?.nom}</h3>
@@ -552,6 +628,7 @@ export default function Jeu() {
             )}
           </div>
         );
+      }
 
       case 5:
         if (actionEnCours) {
