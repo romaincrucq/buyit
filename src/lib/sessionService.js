@@ -69,6 +69,45 @@ export async function obtenirJoueur(codeSession, nom) {
   return snapshot.val();
 }
 
+export async function verifierTousLesJoueurs(codeSession, nomsJoueurs) {
+  const sessionRef = ref(db, `sessions/${codeSession}`);
+  const snapshot = await get(sessionRef);
+  const session = snapshot.val();
+
+  if (!session || !session.joueurs) {
+    return {
+      ok: false,
+      message: 'Session non trouvée',
+      joueursManquants: nomsJoueurs,
+    };
+  }
+
+  const joueursEnBDD = Object.entries(session.joueurs);
+  const joueursManquants = [];
+  const joueursIncorrects = [];
+
+  for (const nomJoueur of nomsJoueurs) {
+    const joueur = joueursEnBDD.find(([cle]) => cle.toLowerCase() === nomJoueur.toLowerCase());
+
+    if (!joueur) {
+      joueursManquants.push(nomJoueur);
+    } else if (!joueur[1] || !joueur[1].nom || joueur[1].cash === undefined) {
+      joueursIncorrects.push({ nom: nomJoueur, raison: 'données incomplètes' });
+    }
+  }
+
+  return {
+    ok: joueursManquants.length === 0 && joueursIncorrects.length === 0,
+    message: joueursManquants.length > 0
+      ? `Joueurs manquants: ${joueursManquants.join(', ')}`
+      : joueursIncorrects.length > 0
+      ? `Données incomplètes: ${joueursIncorrects.map(j => j.nom).join(', ')}`
+      : 'Tous les joueurs sont prêts',
+    joueursManquants,
+    joueursIncorrects,
+  };
+}
+
 export function ecouterJoueur(codeSession, nom, callback) {
   const joueurRef = ref(db, `sessions/${codeSession}/joueurs/${nom}`);
   onValue(joueurRef, (snapshot) => {

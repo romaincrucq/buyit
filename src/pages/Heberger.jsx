@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { creerSession, obtenirSession, mettreAJourSession, obtenirJoueur } from '../lib/sessionService';
+import { creerSession, obtenirSession, mettreAJourSession, obtenirJoueur, verifierTousLesJoueurs } from '../lib/sessionService';
 import { genererCodeSession } from '../lib/gameLogic';
 import { ENTREPRISES } from '../data/entreprises';
 
@@ -71,39 +71,38 @@ export default function Heberger() {
 
       while (!tousLesJoueursOK && tentatives < maxTentatives) {
         tentatives++;
-        let joueursValides = 0;
-        const messages = [];
 
-        for (const nomJoueur of joueurs) {
-          try {
-            const joueur = await obtenirJoueur(code, nomJoueur);
-            if (joueur && joueur.nom && joueur.cash !== undefined) {
-              joueursValides++;
-            } else {
-              messages.push(`${nomJoueur}: données incomplètes`);
-            }
-          } catch (error) {
-            messages.push(`${nomJoueur}: non trouvé`);
-          }
-        }
+        try {
+          const resultat = await verifierTousLesJoueurs(code, joueurs);
+          tousLesJoueursOK = resultat.ok;
 
-        tousLesJoueursOK = joueursValides === joueurs.length;
-
-        if (!tousLesJoueursOK && tentatives < maxTentatives) {
+          const joueursOK = joueurs.length - resultat.joueursManquants.length - resultat.joueursIncorrects.length;
           const tempsRestant = Math.ceil(((maxTentatives - tentatives) * delaiVérification) / 1000);
+
           setVerifyingMessage(
-            `Vérification des connexions... (${joueursValides}/${joueurs.length} connectés) - ${tempsRestant}s`
+            `Vérification des connexions... (${joueursOK}/${joueurs.length} prêts) - ${tempsRestant}s`
           );
+
           console.log(
-            `${joueursValides}/${joueurs.length} joueurs valides, tentative ${tentatives}/${maxTentatives}. ${messages.length > 0 ? 'Problèmes: ' + messages.join(', ') : ''}`
+            `Tentative ${tentatives}/${maxTentatives}: ${resultat.message}`,
+            resultat
           );
-          await new Promise(resolve => setTimeout(resolve, delaiVérification));
+
+          if (!tousLesJoueursOK && tentatives < maxTentatives) {
+            await new Promise(resolve => setTimeout(resolve, delaiVérification));
+          }
+        } catch (error) {
+          console.error(`Erreur vérification tentative ${tentatives}:`, error);
+          if (tentatives < maxTentatives) {
+            await new Promise(resolve => setTimeout(resolve, delaiVérification));
+          }
         }
       }
 
       if (!tousLesJoueursOK) {
         setVerifying(false);
-        alert('Certains joueurs ne sont pas complètement connectés après 10 secondes. Veuillez réessayer.');
+        const resultat = await verifierTousLesJoueurs(code, joueurs);
+        alert(`Certains joueurs ne sont pas complètement connectés après 10 secondes:\n${resultat.message}\n\nVeuillez réessayer.`);
         return;
       }
 
