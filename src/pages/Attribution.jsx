@@ -14,8 +14,8 @@ export default function Attribution() {
   useEffect(() => {
     const attribuer = async () => {
       let tentatives = 0;
-      const maxTentatives = 15;
-      const delaiBase = 500;
+      const maxTentatives = 5;
+      const delaiBase = 2000;
 
       const essayer = async () => {
         try {
@@ -27,7 +27,7 @@ export default function Attribution() {
             if (!session || !session.joueurs) {
               if (tentatives < maxTentatives) {
                 tentatives++;
-                const delai = delaiBase * (1 + tentatives * 0.2);
+                const delai = delaiBase + tentatives * 500;
                 console.log(
                   `Tentative ${tentatives}/${maxTentatives}: Session non trouvée, nouvelle tentative dans ${delai}ms`
                 );
@@ -45,7 +45,7 @@ export default function Attribution() {
             if (!nomTrouve) {
               if (tentatives < maxTentatives) {
                 tentatives++;
-                const delai = delaiBase * (1 + tentatives * 0.2);
+                const delai = delaiBase + tentatives * 500;
                 console.log(
                   `Tentative ${tentatives}/${maxTentatives}: Joueur "${nom}" non trouvé dans [${joueurs.join(
                     ', '
@@ -66,7 +66,7 @@ export default function Attribution() {
           if (!joueur) {
             if (tentatives < maxTentatives) {
               tentatives++;
-              const delai = delaiBase * (1 + tentatives * 0.2);
+              const delai = delaiBase + tentatives * 500;
               console.log(
                 `Tentative ${tentatives}/${maxTentatives}: Données joueur vides, nouvelle tentative dans ${delai}ms`
               );
@@ -105,7 +105,7 @@ export default function Attribution() {
           console.error('Erreur attribution (tentative ' + tentatives + '):', error);
           if (tentatives < maxTentatives) {
             tentatives++;
-            const delai = delaiBase * (1 + tentatives * 0.2);
+            const delai = delaiBase + tentatives * 500;
             console.log(`Tentative ${tentatives}/${maxTentatives}: Erreur, nouvelle tentative dans ${delai}ms`);
             setTimeout(essayer, delai);
             return;
@@ -128,8 +128,32 @@ export default function Attribution() {
   if (loading) {
     return (
       <div className="container-sm" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-        <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🎲</div>
-        <p>Attribution des entreprises...</p>
+        <div className="card" style={{ textAlign: 'center', maxWidth: '400px' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1.5rem', animation: 'pulse 1.5s ease-in-out infinite' }}>
+            🎯
+          </div>
+          <h3 style={{ marginBottom: '1rem' }}>Attribution en cours...</h3>
+          <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+            Nous attribuons ton entreprise. Cela peut prendre jusqu'à 10 secondes selon ta connexion.
+          </p>
+          <div style={{
+            height: '4px',
+            backgroundColor: 'rgba(201, 168, 76, 0.2)',
+            borderRadius: '2px',
+            overflow: 'hidden',
+            marginBottom: '1rem'
+          }}>
+            <div style={{
+              height: '100%',
+              backgroundColor: 'var(--accent)',
+              animation: 'slideRight 2s ease-in-out infinite',
+              width: '30%'
+            }} />
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+            Ne ferme pas cette page
+          </p>
+        </div>
       </div>
     );
   }

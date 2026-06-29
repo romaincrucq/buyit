@@ -323,47 +323,51 @@ export default function Jeu() {
 
       case 5:
         return (
-          <div>
-            <div className="card" style={{ marginBottom: '2rem' }}>
-              <h3 style={{ marginBottom: '1.5rem' }}>Étape 5: Actions Optionnelles</h3>
+          <div className="card">
+            <h3 style={{ marginBottom: '1.5rem' }}>Actions Optionnelles</h3>
 
-              <div className="grid" style={{ marginBottom: '2rem' }}>
-                <button className="btn btn-secondary" style={{ padding: '1rem' }}>
-                  💰 Dividendes
-                </button>
-                <button className="btn btn-secondary" style={{ padding: '1rem' }}>
-                  🏦 Autofinancer
-                </button>
-                <button className="btn btn-secondary" style={{ padding: '1rem' }}>
-                  💳 Rembourser dette
-                </button>
-                <button className="btn btn-secondary" style={{ padding: '1rem' }}>
-                  🃏 Jouer une carte
-                </button>
-              </div>
+            <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
+              Choisis les actions à effectuer ce tour (ou passe directement)
+            </p>
 
-              <CarteDecision
-                onCartePlayed={(carte) => {
-                  console.log('Carte jouée:', carte);
-                }}
-                entreprisesJoueur={joueur.entreprises || []}
-                caisseDisponible={{}}
-              />
-
-              <CarteGeo
-                onCarteGeoPlayed={(carte) => {
-                  console.log('Carte géo jouée:', carte);
-                }}
-              />
-
+            <div className="grid" style={{ marginBottom: '2rem', gap: '0.75rem' }}>
               <button
-                className="btn btn-primary"
-                onClick={afficherRecap}
-                style={{ width: '100%', marginTop: '1.5rem' }}
+                className="btn btn-secondary"
+                onClick={() => console.log('Dividendes')}
+                style={{ padding: '1rem', fontSize: '0.95rem' }}
               >
-                Terminer les actions
+                💰 Dividendes
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => console.log('Autofinancer')}
+                style={{ padding: '1rem', fontSize: '0.95rem' }}
+              >
+                🏦 Autofinancer
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => console.log('Rembourser dette')}
+                style={{ padding: '1rem', fontSize: '0.95rem' }}
+              >
+                💳 Rembourser dette
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => console.log('Jouer une carte')}
+                style={{ padding: '1rem', fontSize: '0.95rem' }}
+              >
+                🃏 Jouer une carte
               </button>
             </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={afficherRecap}
+              style={{ width: '100%', padding: '1rem' }}
+            >
+              ✅ Terminer mon tour
+            </button>
           </div>
         );
 
