@@ -4,6 +4,7 @@ import { obtenirSession, mettreAJourSession, mettreAJourJoueur } from '../lib/se
 import { obtenirEntreprise, ENTREPRISES } from '../data/entreprises';
 import { SYNERGIES } from '../data/synergies';
 import { CONFIG, calculerProgression, calculerRevenu, calculerNouvelleValeur, calculerCouts, calculerDividendes, estEnFaillite } from '../lib/gameLogic';
+import { PLATEAU, obtenirCase, calculerNouvellePosition, aPasseParDepart } from '../data/plateau';
 import TourGuide from '../components/TourGuide';
 import CarteDecision from '../components/CarteDecision';
 import CarteGeo from '../components/CarteGeo';
@@ -18,12 +19,14 @@ export default function Jeu() {
   const [session, setSession] = useState(null);
   const [joueur, setJoueur] = useState(null);
   const [etape, setEtape] = useState(1);
-  const [position, setPosition] = useState(0);
+  const [position, setPosition] = useState(1);
   const [des, setDes] = useState(0);
+  const [inputDes, setInputDes] = useState('');
   const [carteActuelle, setCarteActuelle] = useState(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [faillite, setFaillite] = useState(null);
   const [changements, setChangements] = useState({});
+  const [erreurDes, setErreurDes] = useState('');
 
   useEffect(() => {
     const charger = async () => {
@@ -37,6 +40,16 @@ export default function Jeu() {
             ...j,
             nom,
           });
+
+          if (j.position !== undefined) {
+            setPosition(j.position);
+          } else {
+            setPosition(1);
+          }
+
+          if (sess.joueurActif === nom && etape === 1) {
+            setEtape(2);
+          }
         }
       } catch (error) {
         console.error('Erreur chargement:', error);
@@ -48,11 +61,32 @@ export default function Jeu() {
     return () => clearInterval(interval);
   }, [code, nom]);
 
-  const lancerDes = () => {
-    const resultat = Math.floor(Math.random() * 11) + 2;
+  const validerDes = async () => {
+    const resultat = parseInt(inputDes, 10);
+
+    if (isNaN(resultat) || resultat < 2 || resultat > 12) {
+      setErreurDes('Le résultat des dés doit être entre 2 et 12');
+      return;
+    }
+
     setDes(resultat);
-    const newPos = (position + resultat) % 36;
-    setPosition(newPos);
+    setErreurDes('');
+
+    const anciennePos = position;
+    const nouvellePos = calculerNouvellePosition(anciennePos, resultat);
+    setPosition(nouvellePos);
+
+    const passePar1 = aPasseParDepart(anciennePos, nouvellePos, resultat);
+    const tour = session.tourActuel || 1;
+
+    if (passePar1 && tour > 1) {
+      joueur.cash = (joueur.cash || 0) + 5;
+      await mettreAJourJoueur(code, nom, { cash: joueur.cash, position: nouvellePos });
+    } else {
+      await mettreAJourJoueur(code, nom, { position: nouvellePos });
+    }
+
+    setInputDes('');
     setEtape(3);
   };
 
@@ -67,11 +101,12 @@ export default function Jeu() {
       joueurActif: nextJoueur,
     });
 
-    setEtape(1);
+    setEtape(2);
     setDes(0);
-    setPosition(0);
+    setInputDes('');
     setCarteActuelle(null);
     setFaillite(null);
+    setErreurDes('');
   };
 
   const effectuerCalculs = async () => {
@@ -165,44 +200,78 @@ export default function Jeu() {
 
   const renderEtape = () => {
     switch (etape) {
-      case 1:
-        return (
-          <div className="card">
-            <h3 style={{ marginBottom: '1.5rem' }}>Étape 1: Pioche Automatique</h3>
-            <p style={{ marginBottom: '1.5rem' }}>
-              Tu pioches 1 carte automatiquement ce tour.
-            </p>
-            <button
-              className="btn btn-primary"
-              onClick={() => setEtape(2)}
-              style={{ width: '100%' }}
-            >
-              Continuer
-            </button>
-          </div>
-        );
-
       case 2:
+        const caseActuelle = obtenirCase(position);
         return (
           <div className="card">
-            <h3 style={{ marginBottom: '1.5rem' }}>Étape 2: Lancer les Dés</h3>
-            <p style={{ marginBottom: '1rem' }}>
-              Lance tes dés physiques et saisir le résultat (2-12)
+            <h3 style={{ marginBottom: '1.5rem' }}>Tour {session.tourActuel || 1}: Lancer les Dés</h3>
+            <p style={{ marginBottom: '1rem', color: 'var(--text-muted)' }}>
+              Lance tes dés physiques et saisis le résultat (2-12)
             </p>
 
             {des === 0 ? (
-              <button
-                className="btn btn-primary"
-                onClick={lancerDes}
-                style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
-              >
-                🎲 Lancer les dés
-              </button>
+              <div>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                    Résultat des dés :
+                  </label>
+                  <input
+                    type="number"
+                    min="2"
+                    max="12"
+                    value={inputDes}
+                    onChange={(e) => {
+                      setInputDes(e.target.value);
+                      setErreurDes('');
+                    }}
+                    placeholder="Entrez un nombre entre 2 et 12"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      fontSize: '1.25rem',
+                      textAlign: 'center',
+                      marginBottom: erreurDes ? '0.5rem' : '0',
+                      borderColor: erreurDes ? '#ef4444' : undefined,
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && validerDes()}
+                  />
+                  {erreurDes && (
+                    <p style={{ color: '#ef4444', margin: 0, fontSize: '0.875rem' }}>
+                      {erreurDes}
+                    </p>
+                  )}
+                </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={validerDes}
+                  style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
+                >
+                  🎲 Valider
+                </button>
+              </div>
             ) : (
               <div>
-                <p style={{ fontSize: '2rem', textAlign: 'center', marginBottom: '1.5rem', color: 'var(--accent)' }}>
-                  {des}
-                </p>
+                <div style={{ backgroundColor: 'rgba(201, 168, 76, 0.1)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', margin: '0 0 0.5rem 0' }}>
+                    Résultat des dés
+                  </p>
+                  <p style={{ fontSize: '3rem', color: 'var(--accent)', margin: 0, fontWeight: 'bold' }}>
+                    {des}
+                  </p>
+                </div>
+                <div style={{ backgroundColor: 'rgba(76, 175, 201, 0.1)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1.5rem' }}>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', margin: '0 0 0.5rem 0' }}>
+                    Tu arrives sur
+                  </p>
+                  <p style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0 0 0.25rem 0' }}>
+                    Case {position}: {caseActuelle?.nom}
+                  </p>
+                  {caseActuelle?.effet && (
+                    <p style={{ fontSize: '0.875rem', color: 'var(--accent)', margin: 0 }}>
+                      {caseActuelle.effet}
+                    </p>
+                  )}
+                </div>
                 <button
                   className="btn btn-success"
                   onClick={() => setEtape(3)}
@@ -216,18 +285,19 @@ export default function Jeu() {
         );
 
       case 3:
+        const caseActuelleEtape3 = obtenirCase(position);
         return (
           <div className="card">
-            <h3 style={{ marginBottom: '1.5rem' }}>Étape 3: Effet de la Case</h3>
-            <p style={{ marginBottom: '1.5rem' }}>
-              Tu arrives sur la case {position} : Effet spécial appliqué
+            <h3 style={{ marginBottom: '1.5rem' }}>Case {position}: {caseActuelleEtape3?.nom}</h3>
+            <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
+              {caseActuelleEtape3?.effet || 'Effet de la case appliqué'}
             </p>
             <button
               className="btn btn-primary"
               onClick={effectuerCalculs}
               style={{ width: '100%' }}
             >
-              Appliquer les calculs
+              Continuer
             </button>
           </div>
         );
