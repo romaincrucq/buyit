@@ -41,14 +41,8 @@ export default function Jeu() {
             nom,
           });
 
-          if (j.position !== undefined) {
+          if (j.position !== undefined && j.position !== position) {
             setPosition(j.position);
-          } else {
-            setPosition(1);
-          }
-
-          if (sess.joueurActif === nom && etape === 1) {
-            setEtape(2);
           }
         }
       } catch (error) {
@@ -286,19 +280,44 @@ export default function Jeu() {
 
       case 3:
         const caseActuelleEtape3 = obtenirCase(position);
+        const estDecision = caseActuelleEtape3?.type === 'decision';
+
         return (
           <div className="card">
-            <h3 style={{ marginBottom: '1.5rem' }}>Case {position}: {caseActuelleEtape3?.nom}</h3>
-            <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
-              {caseActuelleEtape3?.effet || 'Effet de la case appliqué'}
-            </p>
-            <button
-              className="btn btn-primary"
-              onClick={effectuerCalculs}
-              style={{ width: '100%' }}
-            >
-              Continuer
-            </button>
+            {estDecision ? (
+              <>
+                <div style={{ fontSize: '2rem', textAlign: 'center', marginBottom: '1rem' }}>
+                  📋
+                </div>
+                <h3 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+                  Pioche une carte Décision dans ta pile !
+                </h3>
+                <p style={{ marginBottom: '2rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                  Case {position}
+                </p>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setEtape(5)}
+                  style={{ width: '100%' }}
+                >
+                  Continuer
+                </button>
+              </>
+            ) : (
+              <>
+                <h3 style={{ marginBottom: '1.5rem' }}>Case {position}: {caseActuelleEtape3?.nom}</h3>
+                <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
+                  {caseActuelleEtape3?.effet || 'Effet de la case appliqué'}
+                </p>
+                <button
+                  className="btn btn-primary"
+                  onClick={effectuerCalculs}
+                  style={{ width: '100%' }}
+                >
+                  Continuer
+                </button>
+              </>
+            )}
           </div>
         );
 
