@@ -5,6 +5,7 @@ import { obtenirEntreprise, ENTREPRISES } from '../data/entreprises';
 import { SYNERGIES } from '../data/synergies';
 import { CONFIG, calculerProgression, calculerRevenu, calculerNouvelleValeur, calculerCouts, calculerDividendes, estEnFaillite } from '../lib/gameLogic';
 import { PLATEAU, obtenirCase, calculerNouvellePosition, aPasseParDepart } from '../data/plateau';
+import { obtenirCarte } from '../data/cartes';
 import TourGuide from '../components/TourGuide';
 import CarteDecision from '../components/CarteDecision';
 import CarteGeo from '../components/CarteGeo';
@@ -181,41 +182,91 @@ export default function Jeu() {
       return;
     }
 
-    const montant = parseInt(montantAction, 10);
-    if (isNaN(montant) || montant <= 0) {
-      setErreurAction('Saisir un montant valide');
-      return;
-    }
-
     const entreprise = joueur.entreprises.find(e => e.id === entrepriseSelectionnee);
     if (!entreprise) {
       setErreurAction('Entreprise non trouvée');
       return;
     }
 
-    console.log(`Action ${typeAction}: ${montant} sur ${entreprise.id}`);
-
     switch (typeAction) {
-      case 'dividendes':
+      case 'dividendes': {
+        const montant = parseInt(montantAction, 10);
+        if (isNaN(montant) || montant <= 0) {
+          setErreurAction('Saisir un montant valide');
+          return;
+        }
+
+        const caisse = entreprise.caisse || 0;
+        if (caisse < montant) {
+          setErreurAction(`Caisse insuffisante (disponible: ${caisse})`);
+          return;
+        }
+
         const dividendes = Math.floor(montant * 0.70);
         joueur.cash = (joueur.cash || 0) + dividendes;
+        entreprise.caisse = caisse - montant;
+        console.log(`Dividendes: ${montant} prélevés de la caisse, ${dividendes} reçus`);
         break;
-      case 'autofinancer':
+      }
+
+      case 'autofinancer': {
+        const montant = parseInt(montantAction, 10);
+        if (isNaN(montant) || montant <= 0) {
+          setErreurAction('Saisir un montant valide');
+          return;
+        }
+
         if (joueur.cash < montant) {
           setErreurAction('Cash insuffisant');
           return;
         }
+
         joueur.cash -= montant;
         entreprise.caisse = (entreprise.caisse || 0) + montant;
+        console.log(`Autofinancement: ${montant} ajoutés à la caisse`);
         break;
-      case 'rembourser':
+      }
+
+      case 'rembourser': {
+        const montant = parseInt(montantAction, 10);
+        if (isNaN(montant) || montant <= 0) {
+          setErreurAction('Saisir un montant valide');
+          return;
+        }
+
+        const dette = entreprise.dette || 0;
+        if (dette === 0) {
+          setErreurAction('Cette entreprise n\'a pas de dette.');
+          return;
+        }
+
         if (joueur.cash < montant) {
           setErreurAction('Cash insuffisant');
           return;
         }
+
         joueur.cash -= montant;
-        entreprise.dette = Math.max(0, (entreprise.dette || 0) - montant);
+        entreprise.dette = Math.max(0, dette - montant);
+        console.log(`Remboursement: ${montant} déduit de la dette`);
         break;
+      }
+
+      case 'carte': {
+        const codeNormalisé = montantAction.toUpperCase().replace(/-/g, '');
+        if (!codeNormalisé) {
+          setErreurAction('Saisir un code de carte');
+          return;
+        }
+
+        const carte = obtenirCarte(codeNormalisé);
+        if (!carte) {
+          setErreurAction(`Carte non trouvée: ${codeNormalisé}`);
+          return;
+        }
+
+        console.log(`Carte jouée: ${carte.nom} (${carte.code})`);
+        break;
+      }
     }
 
     await mettreAJourJoueur(code, nom, { cash: joueur.cash, entreprises: joueur.entreprises });
@@ -561,7 +612,7 @@ export default function Jeu() {
                     setMontantAction(e.target.value);
                     setErreurAction('');
                   }}
-                  placeholder="Ex: 50"
+                  placeholder={actionEnCours === 'carte' ? 'Ex: DD01 ou D-D01 ou dd01' : 'Ex: 50'}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
