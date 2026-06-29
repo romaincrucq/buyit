@@ -27,6 +27,12 @@ export default function Jeu() {
   const [faillite, setFaillite] = useState(null);
   const [changements, setChangements] = useState({});
   const [erreurDes, setErreurDes] = useState('');
+  const [codeGeopolitique, setCodeGeopolitique] = useState('');
+  const [erreurGeo, setErreurGeo] = useState('');
+  const [actionEnCours, setActionEnCours] = useState(null);
+  const [entrepriseSelectionnee, setEntrepriseSelectionnee] = useState(null);
+  const [montantAction, setMontantAction] = useState('');
+  const [erreurAction, setErreurAction] = useState('');
 
   useEffect(() => {
     const charger = async () => {
@@ -61,6 +67,25 @@ export default function Jeu() {
       setEtape(2);
     }
   }, [etape]);
+
+  const handleAppliquerGeo = () => {
+    const codeUpper = codeGeopolitique.toUpperCase();
+    const match = codeUpper.match(/^G(\d+)$/);
+
+    if (!match) {
+      setErreurGeo('Format invalide. Utilise G01, G15, etc.');
+      return;
+    }
+
+    const numero = parseInt(match[1], 10);
+    if (numero < 1 || numero > 50) {
+      setErreurGeo('Le numéro doit être entre 01 et 50');
+      return;
+    }
+
+    console.log(`Carte géopolitique appliquée: ${codeUpper}`);
+    setErreurGeo('');
+  };
 
   const validerDes = async () => {
     const resultat = parseInt(inputDes, 10);
@@ -150,6 +175,56 @@ export default function Jeu() {
     setEtape(6);
   };
 
+  const effectuerAction = async (typeAction) => {
+    if (!entrepriseSelectionnee) {
+      setErreurAction('Sélectionne une entreprise');
+      return;
+    }
+
+    const montant = parseInt(montantAction, 10);
+    if (isNaN(montant) || montant <= 0) {
+      setErreurAction('Saisir un montant valide');
+      return;
+    }
+
+    const entreprise = joueur.entreprises.find(e => e.id === entrepriseSelectionnee);
+    if (!entreprise) {
+      setErreurAction('Entreprise non trouvée');
+      return;
+    }
+
+    console.log(`Action ${typeAction}: ${montant} sur ${entreprise.id}`);
+
+    switch (typeAction) {
+      case 'dividendes':
+        const dividendes = Math.floor(montant * 0.70);
+        joueur.cash = (joueur.cash || 0) + dividendes;
+        break;
+      case 'autofinancer':
+        if (joueur.cash < montant) {
+          setErreurAction('Cash insuffisant');
+          return;
+        }
+        joueur.cash -= montant;
+        entreprise.caisse = (entreprise.caisse || 0) + montant;
+        break;
+      case 'rembourser':
+        if (joueur.cash < montant) {
+          setErreurAction('Cash insuffisant');
+          return;
+        }
+        joueur.cash -= montant;
+        entreprise.dette = Math.max(0, (entreprise.dette || 0) - montant);
+        break;
+    }
+
+    await mettreAJourJoueur(code, nom, { cash: joueur.cash, entreprises: joueur.entreprises });
+    setActionEnCours(null);
+    setEntrepriseSelectionnee(null);
+    setMontantAction('');
+    setErreurAction('');
+  };
+
   if (!joueur || !session) {
     return <div className="container-sm">Chargement...</div>;
   }
@@ -161,6 +236,30 @@ export default function Jeu() {
         code={code}
         onClose={() => setShowDashboard(false)}
       />
+    );
+  }
+
+  if (session.joueurActif !== nom) {
+    return (
+      <div className="container-sm" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div className="card" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>⏳</div>
+          <h3 style={{ marginBottom: '1rem' }}>C'est le tour de</h3>
+          <p style={{ fontSize: '1.75rem', color: 'var(--accent)', fontWeight: 'bold', marginBottom: '2rem' }}>
+            {session.joueurActif}
+          </p>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
+            Attends ton tour pour jouer. Tu peux consulter ton dashboard en attendant.
+          </p>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowDashboard(true)}
+            style={{ width: '100%', padding: '1rem' }}
+          >
+            📊 Voir mon Dashboard
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -288,6 +387,7 @@ export default function Jeu() {
       case 3:
         const caseActuelleEtape3 = obtenirCase(position);
         const estDecision = caseActuelleEtape3?.type === 'decision';
+        const estGeopolitique = caseActuelleEtape3?.type === 'geopolitique';
 
         return (
           <div className="card">
@@ -310,6 +410,80 @@ export default function Jeu() {
                   Continuer
                 </button>
               </>
+            ) : estGeopolitique ? (
+              <>
+                <div style={{ fontSize: '2rem', textAlign: 'center', marginBottom: '1rem' }}>
+                  🌍
+                </div>
+                <h3 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+                  Pioche 3 cartes Géopolitiques
+                </h3>
+                <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                  Choisis-en une et entre son code ci-dessous
+                </p>
+
+                {codeGeopolitique === '' ? (
+                  <div>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                        Code de la carte (G01 à G50) :
+                      </label>
+                      <input
+                        type="text"
+                        value={codeGeopolitique}
+                        onChange={(e) => {
+                          setCodeGeopolitique(e.target.value.toUpperCase());
+                          setErreurGeo('');
+                        }}
+                        placeholder="Ex: G15"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          fontSize: '1.25rem',
+                          textAlign: 'center',
+                          marginBottom: erreurGeo ? '0.5rem' : '0',
+                          borderColor: erreurGeo ? '#ef4444' : undefined,
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && codeGeopolitique && handleAppliquerGeo()}
+                      />
+                      {erreurGeo && (
+                        <p style={{ color: '#ef4444', margin: 0, fontSize: '0.875rem' }}>
+                          {erreurGeo}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleAppliquerGeo}
+                      disabled={!codeGeopolitique}
+                      style={{ width: '100%' }}
+                    >
+                      Appliquer
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ backgroundColor: 'rgba(201, 168, 76, 0.1)', padding: '1rem', borderRadius: '0.75rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+                      <p style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0, color: 'var(--accent)' }}>
+                        {codeGeopolitique}
+                      </p>
+                    </div>
+                    <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
+                      Effet appliqué à tous les joueurs
+                    </p>
+                    <button
+                      className="btn btn-success"
+                      onClick={() => {
+                        setCodeGeopolitique('');
+                        setEtape(5);
+                      }}
+                      style={{ width: '100%' }}
+                    >
+                      Continuer
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <>
                 <h3 style={{ marginBottom: '1.5rem' }}>Case {position}: {caseActuelleEtape3?.nom}</h3>
@@ -329,6 +503,90 @@ export default function Jeu() {
         );
 
       case 5:
+        if (actionEnCours) {
+          return (
+            <div className="card">
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setActionEnCours(null);
+                  setEntrepriseSelectionnee(null);
+                  setMontantAction('');
+                  setErreurAction('');
+                }}
+                style={{ marginBottom: '1.5rem', width: '100%' }}
+              >
+                ← Retour aux actions
+              </button>
+
+              <h3 style={{ marginBottom: '1.5rem' }}>
+                {actionEnCours === 'dividendes' && '💰 Dividendes'}
+                {actionEnCours === 'autofinancer' && '🏦 Autofinancer'}
+                {actionEnCours === 'rembourser' && '💳 Rembourser dette'}
+                {actionEnCours === 'carte' && '🃏 Jouer une carte'}
+              </h3>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  Sélectionne une entreprise :
+                </label>
+                <select
+                  value={entrepriseSelectionnee || ''}
+                  onChange={(e) => {
+                    setEntrepriseSelectionnee(e.target.value);
+                    setErreurAction('');
+                  }}
+                  style={{ width: '100%', padding: '0.75rem', marginBottom: '1rem' }}
+                >
+                  <option value="">-- Choisis une entreprise --</option>
+                  {(joueur.entreprises || []).map(e => (
+                    <option key={e.id} value={e.id}>
+                      {obtenirEntreprise(e.id)?.nom} (Valeur: {e.valeur})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  {actionEnCours === 'dividendes' && 'Montant à distribuer :'}
+                  {actionEnCours === 'autofinancer' && 'Montant à ajouter à la caisse :'}
+                  {actionEnCours === 'rembourser' && 'Montant à rembourser :'}
+                  {actionEnCours === 'carte' && 'Code de la carte :'}
+                </label>
+                <input
+                  type="text"
+                  value={montantAction}
+                  onChange={(e) => {
+                    setMontantAction(e.target.value);
+                    setErreurAction('');
+                  }}
+                  placeholder="Ex: 50"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    marginBottom: erreurAction ? '0.5rem' : '1.5rem',
+                    borderColor: erreurAction ? '#ef4444' : undefined,
+                  }}
+                />
+                {erreurAction && (
+                  <p style={{ color: '#ef4444', margin: '0 0 1.5rem 0', fontSize: '0.875rem' }}>
+                    {erreurAction}
+                  </p>
+                )}
+              </div>
+
+              <button
+                className="btn btn-success"
+                onClick={() => effectuerAction(actionEnCours)}
+                style={{ width: '100%' }}
+              >
+                Appliquer
+              </button>
+            </div>
+          );
+        }
+
         return (
           <div className="card">
             <h3 style={{ marginBottom: '1.5rem' }}>Actions Optionnelles</h3>
@@ -340,28 +598,28 @@ export default function Jeu() {
             <div className="grid" style={{ marginBottom: '2rem', gap: '0.75rem' }}>
               <button
                 className="btn btn-secondary"
-                onClick={() => console.log('Dividendes')}
+                onClick={() => setActionEnCours('dividendes')}
                 style={{ padding: '1rem', fontSize: '0.95rem' }}
               >
                 💰 Dividendes
               </button>
               <button
                 className="btn btn-secondary"
-                onClick={() => console.log('Autofinancer')}
+                onClick={() => setActionEnCours('autofinancer')}
                 style={{ padding: '1rem', fontSize: '0.95rem' }}
               >
                 🏦 Autofinancer
               </button>
               <button
                 className="btn btn-secondary"
-                onClick={() => console.log('Rembourser dette')}
+                onClick={() => setActionEnCours('rembourser')}
                 style={{ padding: '1rem', fontSize: '0.95rem' }}
               >
                 💳 Rembourser dette
               </button>
               <button
                 className="btn btn-secondary"
-                onClick={() => console.log('Jouer une carte')}
+                onClick={() => setActionEnCours('carte')}
                 style={{ padding: '1rem', fontSize: '0.95rem' }}
               >
                 🃏 Jouer une carte
@@ -405,14 +663,6 @@ export default function Jeu() {
           📊 Dashboard
         </button>
       </div>
-
-      {session.joueurActif !== nom && (
-        <div className="card" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'var(--sector-energie)', marginBottom: '2rem' }}>
-          <p style={{ margin: 0, fontSize: '1.1rem' }}>
-            C'est le tour de <strong>{session.joueurActif}</strong>
-          </p>
-        </div>
-      )}
 
       <TourGuide
         etape={etape}
