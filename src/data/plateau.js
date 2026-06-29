@@ -1,10 +1,40 @@
 export const SECTEURS = {
-  'Agroalimentaire': { cases: [4, 5, 6], entreprises: ['cereales', 'biopremium', 'boissons'] },
-  'Tech': { cases: [11, 12, 13], entreprises: ['reseaux', 'jeux', 'ia'] },
-  'Pharma/Médical': { cases: [16, 17, 18], entreprises: ['medicaments', 'vaccins', 'equipements'] },
-  'Industrie': { cases: [22, 23, 24], entreprises: ['automobile', 'aeronautique', 'materiaux'] },
-  'Grande Distribution': { cases: [29, 30, 31], entreprises: ['hypermarche', 'ecommerce', 'fastfood'] },
-  'Énergie': { cases: [34, 35, 36], entreprises: ['nucleaire', 'fossile', 'renouvelable'] },
+  'Agroalimentaire': {
+    cases: [4, 5, 6],
+    entreprises: ['cereales', 'biopremium', 'boissons'],
+    caseDepart: 4,
+    entrepriseDepart: 'cereales',
+  },
+  'Tech': {
+    cases: [11, 12, 13],
+    entreprises: ['reseaux', 'jeux', 'ia'],
+    caseDepart: 11,
+    entrepriseDepart: 'reseaux',
+  },
+  'Pharma/Médical': {
+    cases: [16, 17, 18],
+    entreprises: ['medicaments', 'vaccins', 'equipements'],
+    caseDepart: 16,
+    entrepriseDepart: 'medicaments',
+  },
+  'Industrie': {
+    cases: [22, 23, 24],
+    entreprises: ['automobile', 'aeronautique', 'materiaux'],
+    caseDepart: 22,
+    entrepriseDepart: 'automobile',
+  },
+  'Grande Distribution': {
+    cases: [29, 30, 31],
+    entreprises: ['hypermarche', 'ecommerce', 'fastfood'],
+    caseDepart: 29,
+    entrepriseDepart: 'hypermarche',
+  },
+  'Énergie': {
+    cases: [34, 35, 36],
+    entreprises: ['nucleaire', 'fossile', 'renouvelable'],
+    caseDepart: 34,
+    entrepriseDepart: 'nucleaire',
+  },
 };
 
 export const PLATEAU = [
@@ -93,4 +123,25 @@ export function obtenirEntreprisesDisponiblesDuSecteur(secteur, joueursData) {
 export function obtenirEntrepriseCorrespondanteLaCase(numero) {
   const caseData = PLATEAU.find(c => c.numero === numero);
   return caseData?.entrepriseId || null;
+}
+
+export function obtenirProprietaireSecteur(secteur, joueursData) {
+  if (!SECTEURS[secteur]) return null;
+
+  const entrepriseDepart = SECTEURS[secteur].entrepriseDepart;
+
+  for (const [nomJoueur, joueur] of Object.entries(joueursData || {})) {
+    if (joueur.entreprises) {
+      const possede = joueur.entreprises.find(e => e.id === entrepriseDepart);
+      if (possede) {
+        return nomJoueur;
+      }
+    }
+  }
+
+  return null;
+}
+
+export function obtenirCaseDePartDuSecteur(secteur) {
+  return SECTEURS[secteur]?.caseDepart || null;
 }

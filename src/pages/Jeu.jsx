@@ -4,7 +4,7 @@ import { obtenirSession, mettreAJourSession, mettreAJourJoueur } from '../lib/se
 import { obtenirEntreprise, ENTREPRISES } from '../data/entreprises';
 import { SYNERGIES } from '../data/synergies';
 import { CONFIG, calculerProgression, calculerRevenu, calculerNouvelleValeur, calculerCouts, calculerDividendes, estEnFaillite } from '../lib/gameLogic';
-import { PLATEAU, obtenirCase, calculerNouvellePosition, aPasseParDepart, obtenirSecteurDeLaCase, obtenirEntreprisesDisponiblesDuSecteur, obtenirEntrepriseCorrespondanteLaCase } from '../data/plateau';
+import { PLATEAU, obtenirCase, calculerNouvellePosition, aPasseParDepart, obtenirSecteurDeLaCase, obtenirEntreprisesDisponiblesDuSecteur, obtenirEntrepriseCorrespondanteLaCase, obtenirProprietaireSecteur, obtenirCaseDePartDuSecteur } from '../data/plateau';
 import { obtenirCarte } from '../data/cartes';
 import TourGuide from '../components/TourGuide';
 import CarteDecision from '../components/CarteDecision';
@@ -587,29 +587,50 @@ export default function Jeu() {
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div>
-                    <p style={{ marginBottom: '1.5rem', color: 'var(--accent)', fontWeight: 'bold' }}>
-                      ⚠️ Toutes les entreprises du secteur sont déjà achetées !
-                    </p>
-                    <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
-                      Tu dois payer 10 💰 au propriétaire de l'entreprise de ta case.
-                    </p>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => {
-                        joueur.cash = Math.max(0, (joueur.cash || 0) - 10);
-                        mettreAJourJoueur(code, nom, { cash: joueur.cash });
-                        setSecteurCaseEtape3(null);
-                        setEntreprisesDispoCaseEtape3([]);
-                        setEtape(5);
-                      }}
-                      style={{ width: '100%' }}
-                    >
-                      Payer le loyer
-                    </button>
-                  </div>
-                )}
+                ) : (() => {
+                  const proprietaire = obtenirProprietaireSecteur(secteurCaseEtape3, session.joueurs);
+                  const caseDepart = obtenirCaseDePartDuSecteur(secteurCaseEtape3);
+
+                  return (
+                    <div>
+                      <p style={{ marginBottom: '1.5rem', color: 'var(--accent)', fontWeight: 'bold' }}>
+                        ⚠️ Toutes les entreprises du secteur sont déjà achetées !
+                      </p>
+                      <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
+                        {proprietaire ? (
+                          <>
+                            Tu dois payer 10 💰 à <strong>{proprietaire}</strong> (propriétaire de la case {caseDepart})
+                          </>
+                        ) : (
+                          'Tu dois payer 10 💰 de loyer.'
+                        )}
+                      </p>
+                      <button
+                        className="btn btn-primary"
+                        onClick={async () => {
+                          const montantLoyer = 10;
+                          joueur.cash = Math.max(0, (joueur.cash || 0) - montantLoyer);
+                          await mettreAJourJoueur(code, nom, { cash: joueur.cash });
+
+                          if (proprietaire && proprietaire !== nom) {
+                            const proprietaireData = session.joueurs[proprietaire];
+                            if (proprietaireData) {
+                              proprietaireData.cash = (proprietaireData.cash || 0) + montantLoyer;
+                              await mettreAJourJoueur(code, proprietaire, { cash: proprietaireData.cash });
+                            }
+                          }
+
+                          setSecteurCaseEtape3(null);
+                          setEntreprisesDispoCaseEtape3([]);
+                          setEtape(5);
+                        }}
+                        style={{ width: '100%' }}
+                      >
+                        Payer le loyer
+                      </button>
+                    </div>
+                  );
+                })()}
               </>
             ) : (
               <>
